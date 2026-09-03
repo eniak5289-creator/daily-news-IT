@@ -39,20 +39,20 @@ log = logging.getLogger('news')
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 
 # =============================================================================
-# 3. 국내 15개 및 해외 20개 RSS 피드 설정
+# 3. 접속 차단 매체를 제외한 국내/해외 RSS 피드 설정
 # =============================================================================
 FEEDS = OrderedDict([
 ('전자신문 IT',('국내','https://rss.etnews.com/03.xml')),('전자신문 AI',('국내','https://rss.etnews.com/04046.xml')),
 ('전자신문 보안',('국내','https://rss.etnews.com/04045.xml')),('전자신문 벤처',('국내','https://rss.etnews.com/22069.xml')),
-('보안뉴스',('국내','https://www.boannews.com/custom/news_rss.asp')),('데일리시큐',('국내','https://www.dailysecu.com/rss/allArticle.xml')),
+('데일리시큐',('국내','https://www.dailysecu.com/rss/allArticle.xml')),
 ('아이티데일리',('국내','https://www.itdaily.kr/rss/allArticle.xml')),('데이터넷',('국내','https://www.datanet.co.kr/rss/allArticle.xml')),
-('디지털데일리',('국내','https://www.ddaily.co.kr/rss/allArticle.xml')),('블로터',('국내','https://www.bloter.net/rss/allArticle.xml')),
+('블로터',('국내','https://www.bloter.net/rss/allArticle.xml')),
 ('AI타임스',('국내','https://www.aitimes.com/rss/allArticle.xml')),('테크M',('국내','https://www.techm.kr/rss/allArticle.xml')),
 ('벤처스퀘어',('국내','https://www.venturesquare.net/feed')),
 ('TechCrunch',('해외','https://techcrunch.com/feed/')),('The Verge',('해외','https://www.theverge.com/rss/index.xml')),
 ('WIRED',('해외','https://www.wired.com/feed/rss')),('Ars Technica',('해외','https://feeds.arstechnica.com/arstechnica/index')),
 ('ZDNET',('해외','https://www.zdnet.com/feed/')),('MIT Technology Review',('해외','https://www.technologyreview.com/feed/')),
-('VentureBeat',('해외','https://venturebeat.com/feed/')),('Engadget',('해외','https://www.engadget.com/rss.xml')),
+('Engadget',('해외','https://www.engadget.com/rss.xml')),
 ('Computerworld',('해외','https://www.computerworld.com/index.rss')),('The Register',('해외','https://www.theregister.com/headlines.atom')),
 ('Hacker News',('해외','https://news.ycombinator.com/rss')),('BleepingComputer',('해외','https://www.bleepingcomputer.com/feed/')),
 ('Krebs on Security',('해외','https://krebsonsecurity.com/feed/')),('Dark Reading',('해외','https://www.darkreading.com/rss.xml')),
@@ -146,9 +146,43 @@ def collect():
     return sorted(unique.values(), key=lambda a: a['published'] or datetime.min.replace(tzinfo=KST), reverse=True)
 
 # =============================================================================
-# 7. HTML 이메일 본문 생성 (이미지 UI 스타일 적용)
+# 7. 요약본 생성 (10줄 이내) 및 HTML 이메일 본문 렌더링
 # =============================================================================
+def generate_summary(rows):
+    if not rows: return ""
+    
+    # 카테고리별 개수 집계
+    cat_counts = {}
+    for r in rows:
+        cat_counts[r['category']] = cat_counts.get(r['category'], 0) + 1
+    sorted_cats = sorted(cat_counts.items(), key=lambda x: x[1], reverse=True)
+    top_cat, top_cat_count = sorted_cats[0][0], sorted_cats[0][1]
+    
+    # 기사가 가장 많은 상위 5개 카테고리에서 최신 헤드라인 1개씩 추출
+    highlights = []
+    seen_cats = set()
+    for r in rows:
+        if r['category'] not in seen_cats and r['category'] in [c[0] for c in sorted_cats[:5]]:
+            highlights.append(f'<li style="margin-bottom: 6px;"><span style="color:#6d28d9; font-weight:bold;">[{r["category"]}]</span> {html.escape(r["title"])}</li>')
+            seen_cats.add(r['category'])
+        if len(highlights) >= 5: break
+            
+    summary_html = f'''
+    <div style="background-color: #f8fafc; border-left: 4px solid #6d28d9; padding: 18px 25px; margin: 25px auto 40px auto; border-radius: 6px; text-align: left; font-size: 14px; color: #334155; line-height: 1.6; max-width: 680px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+        <p style="margin: 0 0 12px 0; font-size: 15px;"><b>💡 오늘의 IT 동향 브리핑</b></p>
+        <p style="margin: 0 0 12px 0;">최근 {HOURS}시간 동안 총 <b>{len(rows)}건</b>의 기사가 수집되었습니다. 특히 <b>'{top_cat}'</b> 분야({top_cat_count}건)의 소식이 가장 활발했습니다. 주요 헤드라인은 다음과 같습니다.</p>
+        <ul style="margin: 0; padding-left: 20px; list-style-type: disc;">
+            {"".join(highlights)}
+        </ul>
+    </div>
+    '''
+    return summary_html
+
 def html_report(rows):
+    # 상단 요약본 생성
+    summary_section = generate_summary(rows)
+    
+    # 본문 카드 생성
     sections = []
     for cat in RULES:
         data = [a for a in rows if a['category'] == cat]
@@ -184,12 +218,17 @@ def html_report(rows):
     </head>
     <body style="font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; background-color: #f7f5fa; margin: 0; padding: 40px 20px;">
         <div style="max-width: 760px; margin: 0 auto;">
-            <div style="text-align: center; margin-bottom: 50px; padding-top: 20px;">
+            <div style="text-align: center; margin-bottom: 20px; padding-top: 20px;">
                 <span style="background-color: #6d28d9; color: #ffffff; padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: bold; letter-spacing: 0.5px;">이달의 IT 뉴스</span>
                 <h1 style="margin-top: 20px; font-size: 28px; font-weight: bold; color: #111827; letter-spacing: -1px; word-break: keep-all;">AI 시대, 달라지는 인프라 선택 기준</h1>
                 <p style="color: #64748b; font-size: 14px; margin-top: 15px;"><b>{NOW:%Y-%m-%d}</b> 기준 최근 {HOURS}시간 기사 리포트</p>
             </div>
+            
+            <!-- 10줄 이내 동향 브리핑 -->
+            {summary_section}
+            
             {"".join(sections)}
+            
             <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 40px 0;">
             <div style="text-align: center; color: #94a3b8; font-size: 12px; margin-bottom: 20px;">
                 <p>본 메일의 원문 제목과 링크는 각 매체에 귀속됩니다.</p>
@@ -236,7 +275,7 @@ def mail(body):
                 log.info('메일 발송 완료: %s', receiver)
                 
     except smtplib.SMTPAuthenticationError:
-        log.error('❌ 메일 발송 실패: SMTP 인증 오류. 이메일 계정의 비밀번호가 잘못되었거나 앱 비밀번호 설정이 필요합니다. 구글 계정인 경우 "앱 비밀번호(16자리)"를 발급받아 환경 변수(EMAIL_PASSWORD)에 등록하세요.')
+        log.error('❌ 메일 발송 실패: SMTP 인증 오류. 이메일 계정의 비밀번호가 잘못되었거나 앱 비밀번호 설정이 필요합니다.')
     except Exception as e:
         log.error('❌ 메일 발송 중 알 수 없는 오류 발생: %s', e)
 
