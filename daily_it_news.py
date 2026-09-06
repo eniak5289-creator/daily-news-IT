@@ -143,13 +143,14 @@ def collect():
     for a in rows:
         key = hashlib.sha256(re.sub(r'[^0-9a-z가-힣]+', '', a['title'].lower()).encode()).hexdigest()
         unique.setdefault(key, a)
+    # 기사를 게시일(published) 기준 최신순으로 정렬 (가장 최근 기사가 맨 위로 옴)
     return sorted(unique.values(), key=lambda a: a['published'] or datetime.min.replace(tzinfo=KST), reverse=True)
 
 # =============================================================================
-# 7. 요약본 생성 (10줄 이내) 및 HTML 이메일 본문 렌더링
+# 7. 요약본 생성 및 메인 타이틀 동적 추출
 # =============================================================================
 def generate_summary(rows):
-    if not rows: return ""
+    if not rows: return "", "오늘의 주요 IT 이슈"
     
     # 카테고리별 개수 집계
     cat_counts = {}
@@ -158,7 +159,18 @@ def generate_summary(rows):
     sorted_cats = sorted(cat_counts.items(), key=lambda x: x[1], reverse=True)
     top_cat, top_cat_count = sorted_cats[0][0], sorted_cats[0][1]
     
-    # 기사가 가장 많은 상위 5개 카테고리에서 최신 헤드라인 1개씩 추출
+    # 가장 기사가 많은 상위 카테고리의 '가장 최신' 기사 제목을 메인 헤드라인으로 추출
+    top_article = next((r for r in rows if r['category'] == top_cat), None)
+    if top_article:
+        main_headline = top_article['title']
+        # 제목이 너무 길면 줄임표 처리
+        if len(main_headline) > 42:
+            main_headline = main_headline[:42] + "..."
+        main_headline = html.escape(main_headline)
+    else:
+        main_headline = "오늘의 주요 IT 동향 및 핵심 이슈"
+    
+    # 상위 5개 카테고리에서 가장 최신(이슈) 헤드라인 1개씩 추출
     highlights = []
     seen_cats = set()
     for r in rows:
@@ -176,11 +188,14 @@ def generate_summary(rows):
         </ul>
     </div>
     '''
-    return summary_html
+    return summary_html, main_headline
 
+# =============================================================================
+# 8. HTML 이메일 본문 렌더링
+# =============================================================================
 def html_report(rows):
-    # 상단 요약본 생성
-    summary_section = generate_summary(rows)
+    # 상단 요약본 및 동적 메인 타이틀 가져오기
+    summary_section, main_headline = generate_summary(rows)
     
     # 본문 카드 생성
     sections = []
@@ -219,8 +234,8 @@ def html_report(rows):
     <body style="font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; background-color: #f7f5fa; margin: 0; padding: 40px 20px;">
         <div style="max-width: 760px; margin: 0 auto;">
             <div style="text-align: center; margin-bottom: 20px; padding-top: 20px;">
-                <span style="background-color: #6d28d9; color: #ffffff; padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: bold; letter-spacing: 0.5px;">이달의 IT 뉴스</span>
-                <h1 style="margin-top: 20px; font-size: 28px; font-weight: bold; color: #111827; letter-spacing: -1px; word-break: keep-all;">AI 시대, 달라지는 인프라 선택 기준</h1>
+                <span style="background-color: #6d28d9; color: #ffffff; padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: bold; letter-spacing: 0.5px;">오늘의 IT 뉴스</span>
+                <h1 style="margin-top: 20px; font-size: 26px; font-weight: bold; color: #111827; letter-spacing: -1px; word-break: keep-all; line-height: 1.4;">{main_headline}</h1>
                 <p style="color: #64748b; font-size: 14px; margin-top: 15px;"><b>{NOW:%Y-%m-%d}</b> 기준 최근 {HOURS}시간 기사 리포트</p>
             </div>
             
@@ -239,7 +254,7 @@ def html_report(rows):
     return html_body
 
 # =============================================================================
-# 8. SMTP 로그인 및 HTML 본문 메일 발송
+# 9. SMTP 로그인 및 HTML 본문 메일 발송
 # =============================================================================
 def mail(body):
     if not SEND: 
@@ -280,7 +295,7 @@ def mail(body):
         log.error('❌ 메일 발송 중 알 수 없는 오류 발생: %s', e)
 
 # =============================================================================
-# 9. 메인 실행 순서
+# 10. 메인 실행 순서
 # =============================================================================
 def main():
  OUT.mkdir(parents=True, exist_ok=True); rows = collect()
