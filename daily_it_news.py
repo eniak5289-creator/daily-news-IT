@@ -73,7 +73,7 @@ RULES = OrderedDict([
 ('엔터프라이즈',['기업','엔터프라이즈','cio','디지털 전환','enterprise','business','saas','software','database','platform','policy'])])
 
 # =============================================================================
-# 5. 텍스트 정리, 게시일 변환, 분류 및 URL 정규화 함수
+# 5. 텍스트 정리, 게시일 변환, 분류 및 썸네일 추출 함수
 # =============================================================================
 def clean(x): return re.sub(r'\s+',' ',html.unescape(re.sub(r'<[^>]+>',' ',str(x or '')))).strip()
 def dt_of(e):
@@ -90,6 +90,21 @@ def category(text):
  return w if score[w] else '엔터프라이즈'
 def canon(u):
  p=urlsplit(u); return urlunsplit((p.scheme.lower(),p.netloc.lower(),p.path.rstrip('/'),'',''))
+
+# 기사 원문에서 썸네일 이미지 주소를 추출 (media_content, links, 또는 img 태그 정규식 검색)
+def extract_image(e):
+    if hasattr(e, 'media_content'):
+        for m in e.media_content:
+            if m.get('url') and (m.get('medium') == 'image' or 'image' in m.get('type', '')): return m.get('url')
+    if hasattr(e, 'links'):
+        for l in e.links:
+            if l.get('type', '').startswith('image/') and l.get('href'): return l.get('href')
+    raw_html = getattr(e, 'summary', '') + getattr(e, 'description', '')
+    if hasattr(e, 'content'):
+        for c in e.content: raw_html += c.get('value', '')
+    match = re.search(r'<img[^>]+src=["\'](http[^"\']+)["\']', raw_html, re.IGNORECASE)
+    if match: return match.group(1)
+    return ''
 
 # =============================================================================
 # 6. RSS 수집, 재시도 및 중복 제거
@@ -118,6 +133,7 @@ def collect():
                 for e in f.entries[:LIMIT]:
                     title = clean(getattr(e, 'title', ''))
                     link = canon(getattr(e, 'link', ''))
+                    img_url = extract_image(e)
                     summary = clean(getattr(e, 'summary', getattr(e, 'description', '')))[:500]
                     pub = dt_of(e)
                     if title and link and (not pub or pub >= cutoff):
@@ -128,7 +144,8 @@ def collect():
                             'source': source,
                             'region': region,
                             'published': pub,
-                            'summary': summary
+                            'summary': summary,
+                            'image': img_url
                         })
                         n += 1
                 log.info('%s: %d건', source, n)
@@ -143,39 +160,35 @@ def collect():
     for a in rows:
         key = hashlib.sha256(re.sub(r'[^0-9a-z가-힣]+', '', a['title'].lower()).encode()).hexdigest()
         unique.setdefault(key, a)
-    # 기사를 게시일(published) 기준 최신순으로 정렬 (가장 최근 기사가 맨 위로 옴)
     return sorted(unique.values(), key=lambda a: a['published'] or datetime.min.replace(tzinfo=KST), reverse=True)
 
 # =============================================================================
-# 7. 요약본 생성 및 메인 타이틀 동적 추출
+# 7. 요약본 생성 (링크 추가) 및 메인 타이틀 동적 추출
 # =============================================================================
 def generate_summary(rows):
     if not rows: return "", "오늘의 주요 IT 이슈"
     
-    # 카테고리별 개수 집계
     cat_counts = {}
     for r in rows:
         cat_counts[r['category']] = cat_counts.get(r['category'], 0) + 1
     sorted_cats = sorted(cat_counts.items(), key=lambda x: x[1], reverse=True)
     top_cat, top_cat_count = sorted_cats[0][0], sorted_cats[0][1]
     
-    # 가장 기사가 많은 상위 카테고리의 '가장 최신' 기사 제목을 메인 헤드라인으로 추출
     top_article = next((r for r in rows if r['category'] == top_cat), None)
     if top_article:
         main_headline = top_article['title']
-        # 제목이 너무 길면 줄임표 처리
         if len(main_headline) > 42:
             main_headline = main_headline[:42] + "..."
         main_headline = html.escape(main_headline)
     else:
         main_headline = "오늘의 주요 IT 동향 및 핵심 이슈"
     
-    # 상위 5개 카테고리에서 가장 최신(이슈) 헤드라인 1개씩 추출
     highlights = []
     seen_cats = set()
     for r in rows:
         if r['category'] not in seen_cats and r['category'] in [c[0] for c in sorted_cats[:5]]:
-            highlights.append(f'<li style="margin-bottom: 6px;"><span style="color:#6d28d9; font-weight:bold;">[{r["category"]}]</span> {html.escape(r["title"])}</li>')
+            # Bullet 기사 제목에 링크를 걸고 새 창(target="_blank") 속성을 추가
+            highlights.append(f'<li style="margin-bottom: 8px;"><span style="color:#6d28d9; font-weight:bold;">[{r["category"]}]</span> <a href="{html.escape(r["link"], quote=True)}" target="_blank" style="text-decoration: none; color: #334155;">{html.escape(r["title"])}</a></li>')
             seen_cats.add(r['category'])
         if len(highlights) >= 5: break
             
@@ -191,13 +204,11 @@ def generate_summary(rows):
     return summary_html, main_headline
 
 # =============================================================================
-# 8. HTML 이메일 본문 렌더링
+# 8. HTML 이메일 본문 렌더링 (썸네일 이미지 포함)
 # =============================================================================
 def html_report(rows):
-    # 상단 요약본 및 동적 메인 타이틀 가져오기
     summary_section, main_headline = generate_summary(rows)
     
-    # 본문 카드 생성
     sections = []
     for cat in RULES:
         data = [a for a in rows if a['category'] == cat]
@@ -209,11 +220,15 @@ def html_report(rows):
             if len(summary) > 130: summary = summary[:130] + '...'
             pub_date = a["published"].strftime("%Y-%m-%d %H:%M") if a["published"] else "날짜 미제공"
             
+            # 추출된 썸네일 이미지가 존재할 경우 이미지 태그 생성
+            img_tag = f'<div style="margin-bottom: 15px;"><a href="{html.escape(a["link"], quote=True)}" target="_blank"><img src="{a["image"]}" alt="기사 썸네일" style="max-width: 100%; height: auto; border-radius: 6px; object-fit: cover;"></a></div>' if a.get('image') else ''
+            
             card = f'''
             <div style="background-color: #ffffff; border-radius: 8px; padding: 25px; margin-bottom: 20px; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
-                <div style="color: #6d28d9; font-size: 13px; font-weight: bold; margin-bottom: 10px;">
+                <div style="color: #6d28d9; font-size: 13px; font-weight: bold; margin-bottom: 12px;">
                     {html.escape(a["source"])} <span style="color:#cbd5e1; font-weight:normal; margin:0 5px;">|</span> <span style="color:#94a3b8; font-weight:normal;">{pub_date}</span>
                 </div>
+                {img_tag}
                 <a href="{html.escape(a["link"], quote=True)}" target="_blank" style="text-decoration: none; color: #111827; font-size: 18px; font-weight: bold; display: block; margin-bottom: 12px; line-height: 1.4; word-break: keep-all;">
                     {html.escape(a["title"])}
                 </a>
@@ -246,7 +261,7 @@ def html_report(rows):
             
             <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 40px 0;">
             <div style="text-align: center; color: #94a3b8; font-size: 12px; margin-bottom: 20px;">
-                <p>본 메일의 원문 제목과 링크는 각 매체에 귀속됩니다.</p>
+                <p>본 메일의 원문 제목과 링크 및 이미지는 각 매체에 귀속됩니다.</p>
             </div>
         </div>
     </body>
