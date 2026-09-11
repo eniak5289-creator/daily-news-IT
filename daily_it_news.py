@@ -88,10 +88,12 @@ def dt_of(e):
 def category(text):
  t=text.lower(); score={c:sum(k in t for k in ks) for c,ks in RULES.items()}; w=max(score,key=score.get)
  return w if score[w] else '엔터프라이즈'
-def canon(u):
- p=urlsplit(u); return urlunsplit((p.scheme.lower(),p.netloc.lower(),p.path.rstrip('/'),'',''))
 
-# 기사 원문에서 썸네일 이미지 주소를 추출 (media_content, links, 또는 img 태그 정규식 검색)
+# (수정됨) Query 문자열(?idxno=...)을 삭제하지 않고 유지하도록 변경
+def canon(u):
+ p = urlsplit(u)
+ return urlunsplit((p.scheme.lower(), p.netloc.lower(), p.path, p.query, ''))
+
 def extract_image(e):
     if hasattr(e, 'media_content'):
         for m in e.media_content:
@@ -187,7 +189,6 @@ def generate_summary(rows):
     seen_cats = set()
     for r in rows:
         if r['category'] not in seen_cats and r['category'] in [c[0] for c in sorted_cats[:5]]:
-            # Bullet 기사 제목에 링크를 걸고 새 창(target="_blank") 속성을 추가
             highlights.append(f'<li style="margin-bottom: 8px;"><span style="color:#6d28d9; font-weight:bold;">[{r["category"]}]</span> <a href="{html.escape(r["link"], quote=True)}" target="_blank" style="text-decoration: none; color: #334155;">{html.escape(r["title"])}</a></li>')
             seen_cats.add(r['category'])
         if len(highlights) >= 5: break
@@ -220,7 +221,6 @@ def html_report(rows):
             if len(summary) > 130: summary = summary[:130] + '...'
             pub_date = a["published"].strftime("%Y-%m-%d %H:%M") if a["published"] else "날짜 미제공"
             
-            # 추출된 썸네일 이미지가 존재할 경우 이미지 태그 생성
             img_tag = f'<div style="margin-bottom: 15px;"><a href="{html.escape(a["link"], quote=True)}" target="_blank"><img src="{a["image"]}" alt="기사 썸네일" style="max-width: 100%; height: auto; border-radius: 6px; object-fit: cover;"></a></div>' if a.get('image') else ''
             
             card = f'''
