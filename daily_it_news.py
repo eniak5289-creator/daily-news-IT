@@ -32,45 +32,51 @@ EMAIL_RECEIVERS = [
     'kdw@innogrid.com',
     'kimjy@innogrid.com',
     'sungjin.lee@innogrid.com',
-    'cjbkhh@innogrid.com'
+    'cjbkhh@innogrid.com',
+    'whkwon@nanuminfo.com'   
 ]
 
 log = logging.getLogger('news')
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 
 # =============================================================================
-# 3. 접속 차단 매체를 제외한 국내/해외 RSS 피드 설정
+# 3. 맞춤형 키워드(Google News) 및 접속 안정성 확보 매체 RSS 피드 설정
 # =============================================================================
 FEEDS = OrderedDict([
-('전자신문 IT',('국내','https://rss.etnews.com/03.xml')),('전자신문 AI',('국내','https://rss.etnews.com/04046.xml')),
-('전자신문 보안',('국내','https://rss.etnews.com/04045.xml')),('전자신문 벤처',('국내','https://rss.etnews.com/22069.xml')),
-('데일리시큐',('국내','https://www.dailysecu.com/rss/allArticle.xml')),
-('아이티데일리',('국내','https://www.itdaily.kr/rss/allArticle.xml')),('데이터넷',('국내','https://www.datanet.co.kr/rss/allArticle.xml')),
+# 구글 뉴스 맞춤형 키워드 검색 (가장 관련성 높은 타겟 기사 수집)
+('맞춤뉴스: AI 인프라', ('국내', 'https://news.google.com/rss/search?q=AI+서버+OR+NPU+OR+GPU+OR+HBM&hl=ko&gl=KR&ceid=KR:ko')),
+('맞춤뉴스: 클라우드/가상화', ('국내', 'https://news.google.com/rss/search?q=클라우드+이전+OR+데이터센터+OR+가상화+OR+오픈스택&hl=ko&gl=KR&ceid=KR:ko')),
+('맞춤뉴스: 공공/엔터프라이즈', ('국내', 'https://news.google.com/rss/search?q=공공+정보시스템+OR+엔터프라이즈+IT+OR+디지털트윈&hl=ko&gl=KR&ceid=KR:ko')),
+
+# 기존 우수 국내 IT 매체
+('전자신문 IT',('국내','https://rss.etnews.com/03.xml')),
+('전자신문 AI',('국내','https://rss.etnews.com/04046.xml')),
+('아이티데일리',('국내','https://www.itdaily.kr/rss/allArticle.xml')),
+('데이터넷',('국내','https://www.datanet.co.kr/rss/allArticle.xml')),
 ('블로터',('국내','https://www.bloter.net/rss/allArticle.xml')),
-('AI타임스',('국내','https://www.aitimes.com/rss/allArticle.xml')),('테크M',('국내','https://www.techm.kr/rss/allArticle.xml')),
-('벤처스퀘어',('국내','https://www.venturesquare.net/feed')),
-('TechCrunch',('해외','https://techcrunch.com/feed/')),('The Verge',('해외','https://www.theverge.com/rss/index.xml')),
-('WIRED',('해외','https://www.wired.com/feed/rss')),('Ars Technica',('해외','https://feeds.arstechnica.com/arstechnica/index')),
-('ZDNET',('해외','https://www.zdnet.com/feed/')),('MIT Technology Review',('해외','https://www.technologyreview.com/feed/')),
-('Engadget',('해외','https://www.engadget.com/rss.xml')),
-('Computerworld',('해외','https://www.computerworld.com/index.rss')),('The Register',('해외','https://www.theregister.com/headlines.atom')),
-('Hacker News',('해외','https://news.ycombinator.com/rss')),('BleepingComputer',('해외','https://www.bleepingcomputer.com/feed/')),
-('Krebs on Security',('해외','https://krebsonsecurity.com/feed/')),('Dark Reading',('해외','https://www.darkreading.com/rss.xml')),
-('Google Cloud Blog',('해외','https://cloudblog.withgoogle.com/rss/')),('AWS News Blog',('해외','https://aws.amazon.com/blogs/aws/feed/')),
-('Microsoft Azure Blog',('해외','https://azure.microsoft.com/en-us/blog/feed/')),('NVIDIA Blog',('해외','https://blogs.nvidia.com/feed/')),
+('AI타임스',('국내','https://www.aitimes.com/rss/allArticle.xml')),
+('테크M',('국내','https://www.techm.kr/rss/allArticle.xml')),
+
+# 해외 주요 매체
+('TechCrunch',('해외','https://techcrunch.com/feed/')),
+('The Verge',('해외','https://www.theverge.com/rss/index.xml')),
+('WIRED',('해외','https://www.wired.com/feed/rss')),
+('ZDNET',('해외','https://www.zdnet.com/feed/')),
+('Computerworld',('해외','https://www.computerworld.com/index.rss')),
+('The Register',('해외','https://www.theregister.com/headlines.atom')),
+('AWS News Blog',('해외','https://aws.amazon.com/blogs/aws/feed/')),
+('NVIDIA Blog',('해외','https://blogs.nvidia.com/feed/')),
 ('Semiconductor Engineering',('해외','https://semiengineering.com/feed/'))])
 
 # =============================================================================
 # 4. 뉴스 카테고리 분류 키워드
 # =============================================================================
 RULES = OrderedDict([
-('AI',['인공지능','생성형 ai','artificial intelligence','machine learning','llm','chatgpt','openai','anthropic','claude','gemini','copilot','deepseek','agentic']),
-('보안',['보안','해킹','랜섬웨어','악성코드','취약점','사이버','security','cyber','ransomware','malware','vulnerability','breach','zero-day','phishing']),
-('클라우드',['클라우드','데이터센터','가상화','쿠버네티스','cloud','aws','azure','google cloud','kubernetes','docker','serverless','vmware']),
-('반도체',['반도체','파운드리','hbm','웨이퍼','semiconductor','chip','nvidia','amd','intel','tsmc','qualcomm','foundry']),
-('모바일',['모바일','스마트폰','갤럭시','아이폰','안드로이드','mobile','smartphone','iphone','android','wearable','tablet','ios']),
-('스타트업',['스타트업','벤처','투자 유치','시드','startup','venture','funding','fundraise','seed round','series a','unicorn']),
-('엔터프라이즈',['기업','엔터프라이즈','cio','디지털 전환','enterprise','business','saas','software','database','platform','policy'])])
+('AI/인프라',['인공지능','생성형 ai','llm','ai 서버','npu','gpu','데이터센터','hbm','nvidia','amd']),
+('클라우드',['클라우드','가상화','쿠버네티스','오픈스택','cloud','aws','azure','kubernetes','vmware']),
+('보안',['보안','해킹','랜섬웨어','악성코드','취약점','security','cyber','ransomware','vulnerability']),
+('반도체',['반도체','파운드리','웨이퍼','semiconductor','chip','intel','tsmc','qualcomm']),
+('엔터프라이즈',['기업','공공','디지털 전환','디지털트윈','정보시스템','enterprise','saas','platform'])])
 
 # =============================================================================
 # 5. 텍스트 정리, 게시일 변환, 분류 및 썸네일 추출 함수
@@ -89,7 +95,6 @@ def category(text):
  t=text.lower(); score={c:sum(k in t for k in ks) for c,ks in RULES.items()}; w=max(score,key=score.get)
  return w if score[w] else '엔터프라이즈'
 
-# (수정됨) Query 문자열(?idxno=...)을 삭제하지 않고 유지하도록 변경
 def canon(u):
  p = urlsplit(u)
  return urlunsplit((p.scheme.lower(), p.netloc.lower(), p.path, p.query, ''))
@@ -165,38 +170,55 @@ def collect():
     return sorted(unique.values(), key=lambda a: a['published'] or datetime.min.replace(tzinfo=KST), reverse=True)
 
 # =============================================================================
-# 7. 요약본 생성 (링크 추가) 및 메인 타이틀 동적 추출
+# 7. 요약본 생성 (맞춤 기사 최우선 반영 로직 추가)
 # =============================================================================
 def generate_summary(rows):
     if not rows: return "", "오늘의 주요 IT 이슈"
     
-    cat_counts = {}
-    for r in rows:
-        cat_counts[r['category']] = cat_counts.get(r['category'], 0) + 1
-    sorted_cats = sorted(cat_counts.items(), key=lambda x: x[1], reverse=True)
-    top_cat, top_cat_count = sorted_cats[0][0], sorted_cats[0][1]
+    # 맞춤 키워드로 수집된 기사들을 필터링
+    custom_articles = [r for r in rows if '맞춤뉴스' in r['source']]
     
-    top_article = next((r for r in rows if r['category'] == top_cat), None)
-    if top_article:
-        main_headline = top_article['title']
-        if len(main_headline) > 42:
-            main_headline = main_headline[:42] + "..."
-        main_headline = html.escape(main_headline)
-    else:
-        main_headline = "오늘의 주요 IT 동향 및 핵심 이슈"
+    # 1. 메인 타이틀: 맞춤 뉴스 중 가장 최신 기사를 최우선으로 노출
+    top_article = custom_articles[0] if custom_articles else rows[0]
+    main_headline = top_article['title']
+    if len(main_headline) > 42:
+        main_headline = main_headline[:42] + "..."
+    main_headline = html.escape(main_headline)
     
+    # 2. 브리핑(하이라이트) 5개 추출 로직
     highlights = []
+    added_links = set()
     seen_cats = set()
+    
+    # A. 맞춤 기사 우선 추출 (최대 3개 할당, 가급적 다양한 카테고리로)
+    for r in custom_articles:
+        if r['category'] not in seen_cats:
+            highlights.append(f'<li style="margin-bottom: 8px;"><span style="color:#e11d48; font-weight:bold;">[🎯맞춤픽]</span> <span style="color:#6d28d9; font-weight:bold;">[{r["category"]}]</span> <a href="{html.escape(r["link"], quote=True)}" target="_blank" style="text-decoration: none; color: #334155;">{html.escape(r["title"])}</a></li>')
+            seen_cats.add(r['category'])
+            added_links.add(r['link'])
+        if len(highlights) >= 3:
+            break
+            
+    # B. 나머지 브리핑 자리는 일반 최신 뉴스로 채우기 (카테고리 중복 방지)
     for r in rows:
-        if r['category'] not in seen_cats and r['category'] in [c[0] for c in sorted_cats[:5]]:
+        if len(highlights) >= 5: break
+        if r['link'] not in added_links and r['category'] not in seen_cats:
             highlights.append(f'<li style="margin-bottom: 8px;"><span style="color:#6d28d9; font-weight:bold;">[{r["category"]}]</span> <a href="{html.escape(r["link"], quote=True)}" target="_blank" style="text-decoration: none; color: #334155;">{html.escape(r["title"])}</a></li>')
             seen_cats.add(r['category'])
+            added_links.add(r['link'])
+            
+    # C. 위 조건으로 5개가 다 채워지지 않았다면, 남은 기사 중 최신순으로 단순 추가
+    for r in rows:
         if len(highlights) >= 5: break
+        if r['link'] not in added_links:
+            prefix = '<span style="color:#e11d48; font-weight:bold;">[🎯맞춤픽]</span> ' if '맞춤뉴스' in r['source'] else ''
+            highlights.append(f'<li style="margin-bottom: 8px;">{prefix}<span style="color:#6d28d9; font-weight:bold;">[{r["category"]}]</span> <a href="{html.escape(r["link"], quote=True)}" target="_blank" style="text-decoration: none; color: #334155;">{html.escape(r["title"])}</a></li>')
+            added_links.add(r['link'])
             
     summary_html = f'''
     <div style="background-color: #f8fafc; border-left: 4px solid #6d28d9; padding: 18px 25px; margin: 25px auto 40px auto; border-radius: 6px; text-align: left; font-size: 14px; color: #334155; line-height: 1.6; max-width: 680px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
         <p style="margin: 0 0 12px 0; font-size: 15px;"><b>💡 오늘의 IT 동향 브리핑</b></p>
-        <p style="margin: 0 0 12px 0;">최근 {HOURS}시간 동안 총 <b>{len(rows)}건</b>의 기사가 수집되었습니다. 특히 <b>'{top_cat}'</b> 분야({top_cat_count}건)의 소식이 가장 활발했습니다. 주요 헤드라인은 다음과 같습니다.</p>
+        <p style="margin: 0 0 12px 0;">최근 {HOURS}시간 동안 총 <b>{len(rows)}건</b>의 기사가 수집되었습니다. 특히 설정하신 <b>관심 키워드(AI 인프라, 클라우드, 디지털 전환 등)</b>를 기반으로 큐레이션 된 최신 맞춤 헤드라인은 다음과 같습니다.</p>
         <ul style="margin: 0; padding-left: 20px; list-style-type: disc;">
             {"".join(highlights)}
         </ul>
