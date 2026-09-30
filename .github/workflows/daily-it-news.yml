@@ -2,13 +2,11 @@ name: Daily IT News
 
 on:
   schedule:
-    # 0분, 10분, 30분 단위의 전 세계 트래픽 병목을 피하기 위해
-    # 비대칭 시간인 17분으로 설정하여 실행 지연(Queue Delay)을 최소화 (매일 KST 07:17 실행)
-    - cron: "17 22 * * *"
+    # UTC 23:47 = KST 08:47 (한국 시간 아침 8시 47분 실행)
+    - cron: "47 23 * * *"
   workflow_dispatch:
 
 permissions:
-  # Keepalive 워크플로우가 60일 방지용 더미 커밋을 푸시할 수 있도록 write 권한 부여
   contents: write
 
 concurrency:
@@ -40,15 +38,10 @@ jobs:
           SEND_EMAIL: "true"
         run: python daily_it_news.py
         
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: daily-it-news-${{ github.run_id }}
-          path: output/
-          if-no-files-found: warn
-          retention-days: 14
+      # 주의: 용량 초과(Repository access blocked)의 원인이었던 
+      # actions/upload-artifact 단계는 서버 용량 확보를 위해 제거했습니다.
 
-      # 60일 저장소 비활동으로 인한 GitHub Actions 스케줄러 자동 중지 방지 (생명 연장)
+      # 60일 저장소 비활동으로 인한 GitHub Actions 스케줄러 자동 중지 방지
       - name: Keepalive Workflow
         uses: gautamkrishnar/keepalive-workflow@v2
-        if: always() # 앞선 파이썬 수집 단계가 실패하더라도 스케줄러는 계속 유지되도록 설정
+        if: always()
